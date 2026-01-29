@@ -12,23 +12,31 @@ venv/
 # Environment variables
 .env
 
-# FAISS data / embeddings
-data/
+# ======================
+# FAISS / embeddings
+# ======================
+data/faiss/
 *.faiss
 
+# ======================
 # Email data
-*.mbox
+# ======================
+# Ignore all emails by default
 *.eml
 
+# ALLOW synthetic mbox files for grading
+!data/emails/
+!data/emails/*.mbox
+
+# ======================
 # Logs
+# ======================
 *.log
 
-# OS files
+# ======================
+# OS / editor files
+# ======================
 .DS_Store
 Thumbs.db
-
-# Streamlit cache
-.streamlit/
-
-# VS Code
 .vscode/
+.streamlit/

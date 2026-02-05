@@ -1,7 +1,11 @@
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
+import logging
 
 from app.rag import answer_query
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -23,4 +27,8 @@ def query_emails(
             top_k=request.top_k
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Query failed")
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error"
+        )

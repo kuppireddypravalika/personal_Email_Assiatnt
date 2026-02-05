@@ -23,7 +23,7 @@ Emails:
 Question:
 {question}
 
-Answer in clear, natural language.
+Answer clearly and concisely.
 """
 
     response = requests.post(
@@ -42,8 +42,8 @@ Answer in clear, natural language.
     )
 
     response.raise_for_status()
-
     answer = response.json().get("response", "").strip()
+
     if not answer:
         raise RuntimeError("Empty LLM response")
 
@@ -67,26 +67,28 @@ def answer_query(user_id: str, question: str, top_k: int = 5) -> Dict:
     sources: List[Dict] = []
 
     for r in results:
-        context_blocks.append(
+        block = (
             f"Subject: {r['subject']}\n"
             f"From: {r['sender']}\n"
             f"Date: {r['timestamp']}\n"
             f"Content: {r['text']}\n"
         )
+        context_blocks.append(block)
+
         sources.append({
             "subject": r["subject"],
             "sender": r["sender"],
-            "timestamp": r["timestamp"]
+            "timestamp": r["timestamp"],
+            "similarity": round(r["similarity"], 3)
         })
 
-    context = "\n---\n".join(context_blocks)
-    context = context[:MAX_CONTEXT_CHARS]
+    context = "\n---\n".join(context_blocks)[:MAX_CONTEXT_CHARS]
 
     try:
         answer = call_llm(context, question)
-    except Exception as e:
+    except Exception:
         return {
-            "answer": f" LLM failed to generate a response: {str(e)}",
+            "answer": "The language model failed to generate a response.",
             "sources": sources
         }
 

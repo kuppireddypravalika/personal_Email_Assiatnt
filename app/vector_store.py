@@ -2,15 +2,14 @@ import os
 import json
 import faiss
 import numpy as np
+from typing import List, Dict, Tuple
 
 
 class FaissStore:
-
     def __init__(self, user_id: str, dim: int = 384):
         self.user_id = user_id
         self.dim = dim
 
-        
         self.user_dir = os.path.join("data", "faiss", user_id)
         os.makedirs(self.user_dir, exist_ok=True)
 
@@ -21,28 +20,27 @@ class FaissStore:
         if os.path.exists(self.index_path):
             self.index = faiss.read_index(self.index_path)
         else:
-            self.index = faiss.IndexFlatL2(self.dim)
+            self.index = faiss.IndexFlatIP(self.dim)
 
-       
         if os.path.exists(self.meta_path):
             try:
                 with open(self.meta_path, "r", encoding="utf-8") as f:
-                    self.metadata = json.load(f)
+                    self.metadata: List[Dict] = json.load(f)
             except Exception:
                 self.metadata = []
         else:
             self.metadata = []
 
-       
-        self.existing_ids = {
-            m.get("message_id") for m in self.metadata
+    
+        self.existing_chunk_ids = {
+            m.get("chunk_id") for m in self.metadata if "chunk_id" in m
         }
 
-    def add(self, vectors, metas):
+    def add(self, vectors: np.ndarray, metas: List[Dict]):
         if vectors is None or len(vectors) == 0:
             return
 
-        vectors = np.array(vectors, dtype="float32")
+        vectors = np.asarray(vectors, dtype="float32")
         if vectors.ndim == 1:
             vectors = vectors.reshape(1, -1)
 
@@ -50,20 +48,31 @@ class FaissStore:
         self.metadata.extend(metas)
         self._save()
 
-    def search(self, query_vector, top_k: int = 5):
+    def search(
+        self,
+        query_vector: np.ndarray,
+        top_k: int = 5,
+        min_score: float = 0.25
+    ) -> List[Dict]:
         if self.index.ntotal == 0:
             return []
 
-        query_vector = np.array(query_vector, dtype="float32")
+        query_vector = np.asarray(query_vector, dtype="float32")
         if query_vector.ndim == 1:
             query_vector = query_vector.reshape(1, -1)
 
-        _, indices = self.index.search(query_vector, top_k)
+        scores, indices = self.index.search(query_vector, top_k)
 
         results = []
-        for idx in indices[0]:
-            if idx < len(self.metadata):
-                results.append(self.metadata[idx])
+        for score, idx in zip(scores[0], indices[0]):
+            if idx < 0 or idx >= len(self.metadata):
+                continue
+            if score < min_score:
+                continue
+
+            item = self.metadata[idx].copy()
+            item["similarity"] = float(score)
+            results.append(item)
 
         return results
 

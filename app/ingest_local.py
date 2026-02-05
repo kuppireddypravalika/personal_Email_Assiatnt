@@ -12,19 +12,16 @@ def ingest_local(user_id: str, mbox_path: str):
 
     print(f"Loaded {len(emails)} emails from {mbox_path}")
 
-    new_count = 0
+    added_chunks = 0
 
     for e in emails:
-        if e["message_id"] in store.existing_ids:
-            continue  
-
         full_text = f"""
 Subject: {e['subject']}
 From: {e['sender']}
 Date: {e['timestamp']}
 
 {e['body']}
-"""
+""".strip()
 
         chunks = chunk_text(full_text)
         if not chunks:
@@ -32,18 +29,26 @@ Date: {e['timestamp']}
 
         vectors = embedder.embed(chunks)
 
-        metas = [{
-            "message_id": e["message_id"],
-            "subject": e["subject"],
-            "sender": e["sender"],
-            "timestamp": e["timestamp"],
-            "text": ch
-        } for ch in chunks]
+        metas = []
+        for idx, chunk in enumerate(chunks):
+            chunk_id = f"{e['message_id']}_{idx}"
+            if chunk_id in store.existing_chunk_ids:
+                continue
 
-        store.add(vectors, metas)
-        new_count += 1
+            metas.append({
+                "chunk_id": chunk_id,
+                "message_id": e["message_id"],
+                "subject": e["subject"],
+                "sender": e["sender"],
+                "timestamp": e["timestamp"],
+                "text": chunk
+            })
 
-    print(f" Ingestion complete ({new_count} new emails added)")
+        if metas:
+            store.add(vectors[:len(metas)], metas)
+            added_chunks += len(metas)
+
+    print(f"Ingestion complete ({added_chunks} new chunks added)")
 
 
 if __name__ == "__main__":
